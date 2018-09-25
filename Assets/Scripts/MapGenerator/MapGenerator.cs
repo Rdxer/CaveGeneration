@@ -15,13 +15,13 @@ public class MapGenerator : MonoBehaviour
 
     [Range(0, 100)]
     public int randomFillPercent = 45;      //随机填充百分比，越大洞越小。
- 
+
     [Range(0, 20)]
-    public int smoothLevel = 4;              
+    public int smoothLevel = 4;
     /// <summary>
     /// 清除小墙体的阈值。
     /// </summary>
-    public int wallThresholdSize = 50;      
+    public int wallThresholdSize = 50;
     public int roomThresholdSize = 50;      //清除小孔的的阈值。
 
     public int passageWidth = 4;            //通道（房间与房间直接）宽度。
@@ -218,49 +218,64 @@ public class MapGenerator : MonoBehaviour
     /// <param name="forceAccessibilityFromMainRoom">是否强制连接到主房间</param>
     private void ConnectClosestRooms(List<Room> allRooms, bool forceAccessibilityFromMainRoom = false)
     {
-        #region 属于第二步操作：roomListA 是还没连接到主房间的房间队列， roomListB 是已经连接到房间B的队列。
-        /// 还没连接到主房间
-        List<Room> roomListA = new List<Room>();
-        /// 已经连接到主房间
-        List<Room> roomListB = new List<Room>();
+       
+        /// 还没连接到主房间 的房间数组
+        List<Room> roomListA = allRooms;
+        /// 已经连接到主房间 房间数组
+        List<Room> roomListB = allRooms;
 
+        #region 属于第二步操作：roomListA 是还没连接到主房间的房间队列， roomListB 是已经连接到房间B的队列。
         if (forceAccessibilityFromMainRoom)                         //是否需要强制连接（直接或间接）到主房间。
-        {
+        { 
+            roomListA = new List<Room>(); 
+            roomListB = new List<Room>();
             foreach (Room room in allRooms)
-                if (room.isAccessibleFromMainRoom)
-                    roomListB.Add(room);                            //已经连接到主房间的加到ListB。
-                else
-                    roomListA.Add(room);                            //没有连接到主房间的加到ListA。为空时将结束递归。
-        }
-        else
-        {
-            roomListA = allRooms;
-            roomListB = allRooms;
-        }
+            {
+                if (room.isAccessibleFromMainRoom) //已经连接到主房间的加到ListB。
+                {
+                    roomListB.Add(room);
+                }
+                else//没有连接到主房间的加到ListA。为空时将结束递归。
+                {
+                    roomListA.Add(room);
+                }
+            }
+        } 
         #endregion
 
+        // 最短距离
         int bestDistance = 0;
+
         Coord bestTileA = new Coord();
         Coord bestTileB = new Coord();
+
         Room bestRoomA = new Room();
         Room bestRoomB = new Room();
+
+        /// 寻找合适的连接
         bool possibleConnectionFound = false;
 
-        foreach (Room roomA in roomListA)                           //遍历没连接到主房间的ListA。
+        // 遍历没连接到主房间的ListA。
+        foreach (Room roomA in roomListA)                           
         {
-            if (!forceAccessibilityFromMainRoom)                    //第一步：如果没有要求连到主房间。
+            // 第一步：如果没有要求连到主房间。
+            if (forceAccessibilityFromMainRoom == false)                    
             {
                 possibleConnectionFound = false;                    //那就不能完成连接任务，需要不止一次连接。
                 if (roomA.connectedRooms.Count > 0)                 //有连接房间，跳过，继续找下一个连接房间。
+                {
                     continue;
+                }
             }
             #region 遍历roomListB，找到距离当前roomA最近的roomB。
             foreach (Room roomB in roomListB)
             {
                 if (roomA == roomB || roomA.IsConnected(roomB))
+                {
                     continue;
-
+                }
                 for (int tileIndexA = 0; tileIndexA < roomA.edgeTiles.Count; tileIndexA++)
+                {
                     for (int tileIndexB = 0; tileIndexB < roomB.edgeTiles.Count; tileIndexB++)
                     {
                         Coord tileA = roomA.edgeTiles[tileIndexA];
@@ -278,15 +293,18 @@ public class MapGenerator : MonoBehaviour
                             bestRoomB = roomB;
                         }
                     }
+                }
             }
             #endregion
             //第一步：找到新的两个连接房间,但是没有要求连接主房间。创建通道。
-            if (possibleConnectionFound && !forceAccessibilityFromMainRoom)
+            if (possibleConnectionFound && forceAccessibilityFromMainRoom == false)
+            {
                 CreatePassage(bestRoomA, bestRoomB, bestTileA, bestTileB);
+            }
         }
 
         //第一步到第二步：当连接完所有房间，但是还没有要求全部连接到主房间，那就开始连接到主房间。
-        if (!forceAccessibilityFromMainRoom)
+        if (forceAccessibilityFromMainRoom == false)
             ConnectClosestRooms(allRooms, true);
 
         //第二步：当成功找到能连接到主房间，通路，继续找一下个能需要连到主房间的房间。
@@ -364,14 +382,19 @@ public class MapGenerator : MonoBehaviour
     private void DrawCircle(Coord c, int r)
     {
         for (int x = -r; x <= r; x++)
+        {
             for (int y = -r; y <= r; y++)
-                if (x * x + y * y <= r * r)
+            {    if (x * x + y * y <= r * r)
                 {
                     int drawX = c.tileX + x;
                     int drawY = c.tileY + y;
                     if (IsInMapRange(drawX, drawY))
+                    {
                         map[drawX, drawY] = TileType.Empty;
-                }
+                    }
+                } 
+            }
+        }
     }
 
     //把xy坐标转换成实际坐标。
@@ -380,23 +403,33 @@ public class MapGenerator : MonoBehaviour
         return new Vector3(-width / 2 + .5f + tile.tileX, 2, -height / 2 + .5f + tile.tileY);
     }
 
-    //判断坐标是否在地图里，不管墙还是洞。
+    /// <summary>
+    /// 判断坐标是否在地图里，不管墙还是洞。
+    /// </summary>
     private bool IsInMapRange(int x, int y)
     {
         return x >= 0 && x < width && y >= 0 && y < height;
     }
 
-    //创建额外边界，这边界不参与任何地图计算
+    /// <summary>
+    /// 创建额外边界，这边界不参与任何地图计算
+    /// </summary>
     private TileType[,] CrateStaticBorder()
     {
         TileType[,] borderedMap = new TileType[width + borderSize * 2, height + borderSize * 2];
 
-        for (int x = 0; x < borderedMap.GetLength(0); x++)
-            for (int y = 0; y < borderedMap.GetLength(1); y++)
+        for (int x = 0; x < borderedMap.GetLength(0); x++) { 
+            for (int y = 0; y < borderedMap.GetLength(1); y++) { 
                 if (x >= borderSize && x < width + borderSize && y >= borderSize && y < height + borderSize)
+                {
                     borderedMap[x, y] = map[x - borderSize, y - borderSize];
+                }
                 else
+                {
                     borderedMap[x, y] = TileType.Wall;
+                }
+            }
+        }
         return borderedMap;
     }
 
@@ -415,7 +448,7 @@ public class MapGenerator : MonoBehaviour
                 }
             }
         }
-    }
+     }
 
 
 }
